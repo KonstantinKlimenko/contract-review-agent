@@ -4,7 +4,7 @@
 
 ## Демонстрация
 
-**[▶ Смотреть демо · 54 секунды](assets/contract-review-demo.mp4)**
+**[▶ Смотреть демо · 54 секунды](https://konstantinklimenko.github.io/contract-review-agent/)** · [Скачать MP4](https://raw.githubusercontent.com/KonstantinKlimenko/contract-review-agent/main/docs/contract-review-demo.mp4)
 
 Загрузка файлов → сводка расхождений → вопрос агенту → черновик письма.
 
