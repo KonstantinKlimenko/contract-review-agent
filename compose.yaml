@@ -1,0 +1,11 @@
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:2.47.4
+    ports:
+      - "127.0.0.1:5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./workflows:/workflows:ro
+
+volumes:
+  n8n_data:

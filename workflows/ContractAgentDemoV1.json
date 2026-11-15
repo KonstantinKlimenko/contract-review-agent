@@ -1,0 +1,743 @@
+{
+  "id": "ContractAgentDemoV1",
+  "name": "Договоры — учебный AI Agent",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "options": {
+          "allowFileUploads": true
+        }
+      },
+      "id": "d1e01db4-a027-47ca-a1b6-200000000000",
+      "name": "Чат",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        224,
+        192
+      ],
+      "webhookId": "contract-agent-demo"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "contract-review-page-chat",
+        "authentication": "headerAuth",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "ContractReviewPageWebhook",
+      "name": "Вопрос из чата по договору",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        448
+      ],
+      "webhookId": "contract-review-page-chat",
+      "notes": "Принимает вопросы из чата после отправки встроенной формы n8n."
+    },
+    {
+      "parameters": {
+        "authentication": "n8nUserAuth",
+        "requireExecuteAccess": true,
+        "formTitle": "Проверка договора",
+        "formDescription": "Выберите DOCX или PDF с текстовым слоем. После отправки откроются статус проверки и чат по договору.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Договор перевозчика",
+              "fieldType": "file",
+              "fieldName": "docx",
+              "multipleFiles": false,
+              "acceptFileTypes": ".docx,.pdf",
+              "requiredField": true
+            }
+          ]
+        },
+        "responseMode": "lastNode",
+        "options": {
+          "buttonLabel": "Проверить договор",
+          "path": "contract-agent-review",
+          "includeUserInOutput": false
+        }
+      },
+      "name": "Форма проверки договора",
+      "id": "NativeAgentReviewForm",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "contract-agent-review"
+    },
+    {
+      "parameters": {
+        "action": "generate",
+        "dataPropertyName": "formSessionId"
+      },
+      "name": "Создать сессию проверки",
+      "id": "NativeAgentReviewSession",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "native-form-response",
+              "leftValue": "={{ $json.formSubmission === true }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Ответ на форму?",
+      "id": "NativeAgentReviewResponseRoute",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1104,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "={{ $json.formRedirect ? 'redirect' : 'text' }}",
+        "redirectUrl": "={{ $json.formRedirect }}",
+        "completionTitle": "Не удалось запустить проверку",
+        "completionMessage": "={{ $json.formError || 'Проверьте, что выбран один DOCX или текстовый PDF и загружен шаблон заказчика.' }}",
+        "options": {}
+      },
+      "name": "Открыть статус и чат",
+      "id": "NativeAgentReviewFormCompletion",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        1328,
+        -96
+      ],
+      "webhookId": "contract-agent-review-result"
+    },
+    {
+      "parameters": {},
+      "name": "Вернуть ответ чата",
+      "id": "NativeAgentReviewChatResponse",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1328,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "is-draft-request",
+              "leftValue": "={{ $json.body?.action === 'draft' }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8b6702fa-153e-4b16-87a4-000000000019",
+      "name": "Запрошен черновик?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        448,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "batch-action",
+              "leftValue": "={{ $json.body?.action === 'batch' }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8c2878b9-5f4a-4821-9414-000000000022",
+      "name": "Вопрос по пакету?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        224,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "n8nUserAuth",
+        "requireExecuteAccess": true,
+        "formTitle": "Пакетная проверка договоров",
+        "formDescription": "Выберите сохранённый шаблон и загрузите в пакет до 10 договоров.",
+        "formFields": {
+          "values": [
+            {
+              "fieldType": "html",
+              "elementName": "templates_link",
+              "html": "<a href=\"http://localhost:5678/form/contract-review-templates\" target=\"_blank\" rel=\"noopener\">Загрузить шаблон Word или согласованные тарифы</a>"
+            }
+          ]
+        },
+        "responseMode": "lastNode",
+        "options": {
+          "buttonLabel": "Выбрать шаблон и файлы",
+          "path": "contract-agent-batch",
+          "includeUserInOutput": false
+        }
+      },
+      "name": "Форма проверки пакета",
+      "id": "BatchReviewForm",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        784
+      ],
+      "webhookId": "contract-agent-batch"
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "={{ $json.redirect ? 'redirect' : 'text' }}",
+        "redirectUrl": "={{ $json.redirect }}",
+        "completionTitle": "Не удалось запустить пакет",
+        "completionMessage": "={{ $json.message || 'Проверьте число файлов и выбранный шаблон.' }}",
+        "options": {}
+      },
+      "name": "Открыть сводку пакета",
+      "id": "BatchReviewFormCompletion",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        1120,
+        784
+      ],
+      "webhookId": "contract-agent-batch-result"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "ContractBatchQueueV1",
+          "mode": "list",
+          "cachedResultName": "Договоры — поставить пакет в очередь"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "CallBatchQueue",
+      "name": "Запустить проверку пакета",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        896,
+        784
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "ContractSingleAgentV1",
+          "mode": "list",
+          "cachedResultName": "Договоры — агент одиночной проверки"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "ContractSingleAgentV1Call",
+      "name": "Агент по договору",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "ContractBatchAgentV1",
+          "mode": "list",
+          "cachedResultName": "Договоры — агент пакетной проверки"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "ContractBatchAgentV1Call",
+      "name": "Агент по пакету",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        704,
+        544
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "ContractReviewDraftV1",
+          "mode": "list",
+          "cachedResultName": "Договоры — черновик перевозчику"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "ContractReviewDraftV1Call",
+      "name": "Подготовить черновик",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        704,
+        352
+      ]
+    },
+    {
+      "id": "ContractTemplateFormV1",
+      "name": "Загрузка шаблонов",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        1024
+      ],
+      "webhookId": "contract-review-templates",
+      "parameters": {
+        "authentication": "n8nUserAuth",
+        "requireExecuteAccess": true,
+        "formTitle": "Загрузка шаблонов проверки",
+        "formDescription": "Выберите шаблон договора DOCX или текстовый PDF, согласованные тарифы XLSX или оба файла. Сохранённые версии будут использоваться в новых проверках.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Шаблон договора DOCX или PDF",
+              "fieldType": "file",
+              "fieldName": "word_template",
+              "multipleFiles": false,
+              "requiredField": false,
+              "acceptFileTypes": ".docx,.pdf"
+            },
+            {
+              "fieldLabel": "Согласованные тарифы XLSX",
+              "fieldType": "file",
+              "fieldName": "rates_template",
+              "multipleFiles": false,
+              "requiredField": false,
+              "acceptFileTypes": ".xlsx"
+            }
+          ]
+        },
+        "responseMode": "lastNode",
+        "options": {
+          "path": "contract-review-templates",
+          "buttonLabel": "Сохранить и активировать",
+          "includeUserInOutput": false
+        }
+      }
+    },
+    {
+      "id": "ContractTemplatePackV1",
+      "name": "Подготовить шаблоны",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        1024
+      ],
+      "parameters": {
+        "jsCode": "const files = $input.first().binary ?? {};\nconst result = {};\nfor (const [field, key] of [['word', 'word_template'], ['rates', 'rates_template']]) {\n  if (!files[key]) continue;\n  const buffer = await this.helpers.getBinaryDataBuffer(0, key);\n  result[field] = {name: files[key].fileName, content: buffer.toString('base64')};\n}\nreturn [{ json: result }];"
+      }
+    },
+    {
+      "id": "ContractTemplateSaveV1",
+      "name": "Активировать версии",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        448,
+        1024
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8765/api/templates",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "ContractTemplateFinishV1",
+      "name": "Открыть активные шаблоны",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        672,
+        1024
+      ],
+      "webhookId": "contract-review-templates-result",
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "={{ $json.redirect ? 'redirect' : 'text' }}",
+        "redirectUrl": "={{ $json.redirect }}",
+        "completionTitle": "Шаблоны не обновились",
+        "completionMessage": "={{ typeof $json.detail === 'string' ? $json.detail : 'Проверьте формат и размер файлов и повторите загрузку.' }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "BatchWordTemplateCatalogV1",
+      "name": "Получить список шаблонов",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        784
+      ],
+      "parameters": {
+        "url": "http://host.docker.internal:8765/api/templates",
+        "options": {
+          "timeout": 10000
+        }
+      }
+    },
+    {
+      "id": "BatchWordTemplatePickerV1",
+      "name": "Выбрать шаблон и файлы",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        448,
+        784
+      ],
+      "parameters": {
+        "operation": "page",
+        "defineForm": "json",
+        "jsonOutput": "={{ (() => {\nconst templates = $json.templates ?? [];\nconst uploads = [{\"fieldLabel\":\"Договоры DOCX или PDF\",\"fieldType\":\"file\",\"fieldName\":\"docx\",\"acceptFileTypes\":\".docx,.pdf\",\"requiredField\":true,\"multipleFiles\":true},{\"fieldName\":\"approved_rates\",\"fieldLabel\":\"Согласованные тарифы XLSX для разовой сверки\",\"fieldType\":\"file\",\"multipleFiles\":false,\"acceptFileTypes\":\".xlsx\",\"requiredField\":false},{\"fieldName\":\"vendor_rates\",\"fieldLabel\":\"Тарифы перевозчика XLSX\",\"fieldType\":\"file\",\"multipleFiles\":false,\"acceptFileTypes\":\".xlsx\",\"requiredField\":false}];\nconst picker = templates.length ? [{\n  fieldLabel: 'Шаблон договора', fieldName: 'template_choice', fieldType: 'dropdown',\n  fieldOptions: {values: templates.map(t => ({option: t.label}))},\n  defaultValue: templates.find(t => t.active)?.label ?? templates[0].label,\n  requiredField: true\n}] : [{fieldType:'html', html:'<p>Сначала загрузите шаблон договора.</p><a href=\"http://localhost:5678/form/contract-review-templates\" target=\"_blank\" rel=\"noopener\">Загрузить шаблон договора или согласованные тарифы</a>'}];\nreturn JSON.stringify([...picker, ...uploads]);\n})() }}",
+        "options": {
+          "formTitle": "Шаблон и файлы пакета",
+          "formDescription": "Один шаблон применяется ко всем DOCX и PDF в пакете. Excel нужен для сверки ставок.",
+          "buttonLabel": "Проверить пакет"
+        }
+      },
+      "webhookId": "contract-agent-batch-documents"
+    },
+    {
+      "id": "BatchWordTemplateMappingV1",
+      "name": "Зафиксировать версию шаблона",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        784
+      ],
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst {templates} = $('Получить список шаблонов').first().json;\nconst selected = templates.find(template => template.label === item.json.template_choice);\nreturn [{json:{...item.json, template_version: selected?.version ?? 'missing'}, binary:item.binary}];"
+      }
+    }
+  ],
+  "connections": {
+    "Чат": {
+      "main": [
+        [
+          {
+            "node": "Агент по договору",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Форма проверки договора": {
+      "main": [
+        [
+          {
+            "node": "Создать сессию проверки",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Создать сессию проверки": {
+      "main": [
+        [
+          {
+            "node": "Агент по договору",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ответ на форму?": {
+      "main": [
+        [
+          {
+            "node": "Открыть статус и чат",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Вернуть ответ чата",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Вопрос из чата по договору": {
+      "main": [
+        [
+          {
+            "node": "Вопрос по пакету?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Запрошен черновик?": {
+      "main": [
+        [
+          {
+            "node": "Подготовить черновик",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Агент по договору",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Вопрос по пакету?": {
+      "main": [
+        [
+          {
+            "node": "Агент по пакету",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Запрошен черновик?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Форма проверки пакета": {
+      "main": [
+        [
+          {
+            "node": "Получить список шаблонов",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Запустить проверку пакета": {
+      "main": [
+        [
+          {
+            "node": "Открыть сводку пакета",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Агент по договору": {
+      "main": [
+        [
+          {
+            "node": "Ответ на форму?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Загрузка шаблонов": {
+      "main": [
+        [
+          {
+            "node": "Подготовить шаблоны",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Подготовить шаблоны": {
+      "main": [
+        [
+          {
+            "node": "Активировать версии",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Активировать версии": {
+      "main": [
+        [
+          {
+            "node": "Открыть активные шаблоны",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Получить список шаблонов": {
+      "main": [
+        [
+          {
+            "node": "Выбрать шаблон и файлы",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Выбрать шаблон и файлы": {
+      "main": [
+        [
+          {
+            "node": "Зафиксировать версию шаблона",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Зафиксировать версию шаблона": {
+      "main": [
+        [
+          {
+            "node": "Запустить проверку пакета",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "binaryMode": "separate"
+  }
+}

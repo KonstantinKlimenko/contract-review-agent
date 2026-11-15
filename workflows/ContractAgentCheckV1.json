@@ -1,0 +1,115 @@
+{
+  "id": "ContractAgentCheckV1",
+  "name": "Договоры — проверить вложение",
+  "active": false,
+  "nodes": [
+    {
+      "id": "Получить DOCX",
+      "name": "Получить DOCX",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "workflowInputs",
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "fileName",
+              "type": "string"
+            },
+            {
+              "name": "content",
+              "type": "string"
+            },
+            {
+              "name": "sessionId",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "Восстановить DOCX",
+      "name": "Восстановить DOCX",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const { fileName, content, sessionId } = $input.first().json;\nif (typeof fileName !== 'string' || !/\\.(docx|pdf)$/i.test(fileName) || typeof content !== 'string' || !content) {\n  throw new Error('Приложите один DOCX или PDF.');\n}\nif (typeof sessionId !== 'string' || !sessionId.trim()) {\n  throw new Error('Не удалось определить сессию чата.');\n}\nconst mimeType = /\\.pdf$/i.test(fileName) ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';\nconst docx = await this.helpers.prepareBinaryData(Buffer.from(content, 'base64'), fileName, mimeType);\nreturn [{ json: { fileName, sessionId }, binary: { docx } }];"
+      }
+    },
+    {
+      "id": "Запустить проверку",
+      "name": "Запустить проверку",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8765/api/reviews",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "={{ $json.fileName }}"
+            },
+            {
+              "name": "session_id",
+              "value": "={{ $json.sessionId }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "docx",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Получить DOCX": {
+      "main": [
+        [
+          {
+            "node": "Восстановить DOCX",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Восстановить DOCX": {
+      "main": [
+        [
+          {
+            "node": "Запустить проверку",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}

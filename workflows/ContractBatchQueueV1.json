@@ -1,0 +1,283 @@
+{
+  "id": "ContractBatchQueueV1",
+  "name": "Договоры — поставить пакет в очередь",
+  "active": false,
+  "nodes": [
+    {
+      "id": "BatchInput",
+      "name": "Получить файлы из формы",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "BatchNative29",
+      "name": "Собрать вложения пакета",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const docs = [];\nconst rates = {};\nfor (const item of $input.all()) {\n  for (const [key, file] of Object.entries(item.binary ?? {})) {\n    if (/^approved_rates(?:_\\d+)?$/.test(key)) rates.approved = file;\n    else if (/^vendor_rates(?:_\\d+)?$/.test(key)) rates.vendor = file;\n    else docs.push(file);\n  }\n}\nreturn [{\n  json: {template_version: $input.first().json.template_version, files: docs.map(file => file.fileName || 'Договор.docx')},\n  binary: {...Object.fromEntries(docs.map((file, index) => ['file' + index, file])), ...rates},\n}];"
+      }
+    },
+    {
+      "id": "BatchNative30",
+      "name": "Создать пакет",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8765/api/batches",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({files:$json.files, template_version:$json.template_version}) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "BatchNative31",
+      "name": "Разложить файлы пакета",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const batchId = $input.first().json.id;\nif (!batchId) return [{json:{valid:false}}];\nconst prepared = $('Собрать вложения пакета').first();\nreturn prepared.json.files.map((_, position) => ({\n  json: {valid: true, batchId, position},\n  binary: {docx: prepared.binary['file' + position]},\n}));"
+      }
+    },
+    {
+      "id": "BatchNative32",
+      "name": "Пакет создан?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "native-batch-valid",
+              "leftValue": "={{ $json.valid === true }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "BatchNative33",
+      "name": "Поставить договоры в очередь",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        0
+      ],
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ 'http://host.docker.internal:8765/api/batches/' + $json.batchId + '/files/' + $json.position }}",
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "docx",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "timeout": 30000
+      }
+    },
+    {
+      "id": "BatchOutput",
+      "name": "Вернуть ссылку на сводку",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        48
+      ],
+      "parameters": {
+        "jsCode": "const batch = $('Создать пакет').first().json;\nconst valid = typeof batch.id === 'string' && /^[a-f0-9]{32}$/.test(batch.id);\nreturn [{json:{redirect:valid ? 'http://localhost:8765/batch?id=' + batch.id : null, message: typeof batch.detail === 'string' ? batch.detail : null}}];"
+      }
+    },
+    {
+      "id": "ContractBatchRatesInput",
+      "name": "Передать приложения в сверку",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        -100
+      ],
+      "parameters": {
+        "jsCode": "const { approved, vendor } = $('Собрать вложения пакета').first().binary;\nconst batchId = $('Создать пакет').first().json.id;\nreturn [{json: {batchId}, binary: {...(approved && {approved}), ...(vendor && {vendor})}}];"
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "ContractBatchRatesV1",
+          "mode": "list",
+          "cachedResultName": "Договоры — сверить тарифы Excel"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "ContractBatchRatesCall",
+      "name": "Сверить тарифы Excel",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1568,
+        -100
+      ],
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Получить файлы из формы": {
+      "main": [
+        [
+          {
+            "node": "Собрать вложения пакета",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Собрать вложения пакета": {
+      "main": [
+        [
+          {
+            "node": "Создать пакет",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Создать пакет": {
+      "main": [
+        [
+          {
+            "node": "Разложить файлы пакета",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Разложить файлы пакета": {
+      "main": [
+        [
+          {
+            "node": "Пакет создан?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Пакет создан?": {
+      "main": [
+        [
+          {
+            "node": "Поставить договоры в очередь",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Вернуть ссылку на сводку",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Поставить договоры в очередь": {
+      "main": [
+        [
+          {
+            "node": "Передать приложения в сверку",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Передать приложения в сверку": {
+      "main": [
+        [
+          {
+            "node": "Сверить тарифы Excel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Сверить тарифы Excel": {
+      "main": [
+        [
+          {
+            "node": "Вернуть ссылку на сводку",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}
